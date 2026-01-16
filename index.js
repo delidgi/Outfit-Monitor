@@ -1,15 +1,10 @@
 import { eventSource, event_types, saveSettingsDebounced, setExtensionPrompt, extension_prompt_types } from '../../../../script.js';
 import { extension_settings } from '../../../extensions.js';
 
-const extensionName = 'scene-outfit-monitor';
+const extensionName = 'outfit-monitor';
 
 const defaultSettings = {
     isEnabled: true,
-    scene: {
-        location: 'Неизвестно',
-        userPosition: 'Неизвестно',
-        charPosition: 'Неизвестно'
-    },
     outfit: {
         outerWear: '',
         top: '',
@@ -29,92 +24,42 @@ function getSettings() {
 function parseAIMessage(text) {
     const s = getSettings();
     let updated = false;
-    const locationPatterns = [
-        /(?:вошл[аи]|зашл[аи]|пришл[аи]|оказал[аи]сь|нахо[дж](?:и[тл]ся|усь)) (?:в|на) ([^.!?,]{3,30})/gi,
-        /(?:в|на) ([а-яё]{4,20}(?:ой|ей|е|и|ой комнате|ем))/gi
-    ];
-
-    for (const pattern of locationPatterns) {
-        const match = text.match(pattern);
-        if (match) {
-            let loc = match[0].replace(/вошл[аи]|зашл[аи]|пришл[аи]|в |на /gi, '').trim();
-            loc = loc.charAt(0).toUpperCase() + loc.slice(1);
-            if (loc.length > 3 && loc.length < 30) {
-                s.scene.location = loc;
-                updated = true;
-                console.log('[SceneOutfit] Локация:', loc);
-                break;
-            }
-        }
-    }
-
-    const userPosPatterns = [
-        /(?:сел[аи]|лег[ли]а|встал[аи]|подошл[аи]|присел[аи]) (?:на|в|к|у) ([^.!?,]{3,30})/gi,
-        /(?:на|в|у) ([а-яё]{4,20}(?:е|и|у|ом|ой))/gi
-    ];
-
-    for (const pattern of userPosPatterns) {
-        const match = text.match(pattern);
-        if (match) {
-            let pos = match[0].replace(/сел[аи]|лег[ли]а|встал[аи]|подошл[аи]|присел[аи]/gi, '').trim();
-            pos = pos.charAt(0).toUpperCase() + pos.slice(1);
-            if (pos.length > 2 && pos.length < 30) {
-                s.scene.userPosition = pos;
-                updated = true;
-                console.log('[SceneOutfit] {{user}} позиция:', pos);
-                break;
-            }
-        }
-    }
-
-    const charName = window.name2 || '{{char}}';
-    const charPosPattern = new RegExp(`${charName}.*?(?:сто[ия]т|сидит|лежит|подош[её]л) (?:у|на|в|к) ([^.!?,]{3,30})`, 'gi');
-    const charMatch = text.match(charPosPattern);
-    if (charMatch) {
-        let pos = charMatch[0].replace(new RegExp(charName, 'gi'), '').replace(/сто[ия]т|сидит|лежит|подош[её]л/gi, '').trim();
-        pos = pos.charAt(0).toUpperCase() + pos.slice(1);
-        if (pos.length > 2 && pos.length < 30) {
-            s.scene.charPosition = pos;
-            updated = true;
-            console.log('[SceneOutfit] {{char}} позиция:', pos);
-        }
-    }
 
     if (/(сняла?|снял|разделась|разделся|скинула?)/gi.test(text)) {
         if (/куртк|пальто|плащ|пиджак/gi.test(text)) {
             s.outfit.outerWear = '';
             updated = true;
-            console.log('[SceneOutfit] Снята верхняя одежда');
+            console.log('[Outfit] Снята верхняя одежда');
         }
         if (/футболк|рубашк|свитер|майк|топ|блузк/gi.test(text)) {
             s.outfit.top = '';
             updated = true;
-            console.log('[SceneOutfit] Снят верх');
+            console.log('[Outfit] Снят верх');
         }
         if (/джинс|штан|брюк|шорт|юбк/gi.test(text)) {
             s.outfit.bottom = '';
             updated = true;
-            console.log('[SceneOutfit] Снят низ');
+            console.log('[Outfit] Снят низ');
         }
         if (/платье|сарафан|комбинезон/gi.test(text)) {
             s.outfit.dress = '';
             updated = true;
-            console.log('[SceneOutfit] Снято платье');
+            console.log('[Outfit] Снято платье');
         }
         if (/трус|белье|лифчик|бюстгальтер/gi.test(text)) {
             s.outfit.underwear = '';
             updated = true;
-            console.log('[SceneOutfit] Снято бельё');
+            console.log('[Outfit] Снято бельё');
         }
         if (/туфл|ботинк|кроссовк|сапог|обувь/gi.test(text)) {
             s.outfit.shoes = '';
             updated = true;
-            console.log('[SceneOutfit] Снята обувь');
+            console.log('[Outfit] Снята обувь');
         }
         if (/босиком|босая|разулась/gi.test(text)) {
             s.outfit.shoes = 'Босиком';
             updated = true;
-            console.log('[SceneOutfit] Босиком');
+            console.log('[Outfit] Босиком');
         }
     }
 
@@ -125,7 +70,7 @@ function parseAIMessage(text) {
             s.outfit.top = '';
             s.outfit.bottom = '';
             updated = true;
-            console.log('[SceneOutfit] Надето платье:', s.outfit.dress);
+            console.log('[Outfit] Надето платье:', s.outfit.dress);
         }
     }
 
@@ -137,7 +82,7 @@ function parseAIMessage(text) {
         s.outfit.underwear = '';
         s.outfit.shoes = 'Босиком';
         updated = true;
-        console.log('[SceneOutfit] Полное раздевание');
+        console.log('[Outfit] Полное раздевание');
     }
 
     if (/мокр[аы][яеи]* волос/gi.test(text)) {
@@ -162,45 +107,35 @@ function updatePromptInjection() {
         return;
     }
 
-    let prompt = `\n\n[OOC: 📍 ТЕКУЩАЯ СЦЕНА\n`;
-    prompt += `Локация: ${s.scene.location}\n`;
-    prompt += `🧍 {{user}}: ${s.scene.userPosition}\n`;
-    prompt += `🎭 {{char}}: ${s.scene.charPosition}\n\n`;
-
     const outfit = [];
-    if (s.outfit.outerWear) outfit.push(`Верхняя одежда: ${s.outfit.outerWear}`);
+    if (s.outfit.outerWear) outfit.push(`🧥 Верхняя одежда: ${s.outfit.outerWear}`);
     if (s.outfit.dress) {
-        outfit.push(`Платье: ${s.outfit.dress}`);
+        outfit.push(`👗 Платье: ${s.outfit.dress}`);
     } else {
-        if (s.outfit.top) outfit.push(`Верх: ${s.outfit.top}`);
-        if (s.outfit.bottom) outfit.push(`Низ: ${s.outfit.bottom}`);
+        if (s.outfit.top) outfit.push(`👕 Верх: ${s.outfit.top}`);
+        if (s.outfit.bottom) outfit.push(`👖 Низ: ${s.outfit.bottom}`);
     }
-    if (s.outfit.underwear) outfit.push(`Бельё: ${s.outfit.underwear}`);
-    if (s.outfit.accessories) outfit.push(`Аксессуары: ${s.outfit.accessories}`);
-    if (s.outfit.shoes) outfit.push(`Обувь: ${s.outfit.shoes}`);
-    if (s.outfit.features) outfit.push(`Особенности: ${s.outfit.features}`);
+    if (s.outfit.underwear) outfit.push(`🩲 Бельё: ${s.outfit.underwear}`);
+    if (s.outfit.accessories) outfit.push(`💍 Аксессуары: ${s.outfit.accessories}`);
+    if (s.outfit.shoes) outfit.push(`👟 Обувь: ${s.outfit.shoes}`);
+    if (s.outfit.features) outfit.push(`✨ Особенности: ${s.outfit.features}`);
 
-    if (outfit.length > 0) {
-        prompt += `👔 {{user}} одета:\n`;
-        prompt += outfit.join('\n');
-        prompt += `\n\n`;
+    if (outfit.length === 0) {
+        setExtensionPrompt(extensionName, '', extension_prompt_types.IN_CHAT, 0);
+        return;
     }
 
-    prompt += `⚠️ Описывай действия с учётом локации и одежды персонажей!]`;
+    let prompt = `[OOC: 👔 АУТФИТ {{user}}:\n${outfit.join('\n')}\n⚠️ Учитывай одежду в описаниях!]`;
 
     setExtensionPrompt(extensionName, prompt, extension_prompt_types.IN_CHAT, 0);
-    console.log('[SceneOutfit] Промпт обновлён');
+    console.log('[Outfit] Промпт обновлён');
 }
 
 function syncUI() {
     const s = getSettings();
 
-    const enabledCheck = $('#scene-outfit-enabled');
+    const enabledCheck = $('#outfit-enabled');
     if (enabledCheck.length) enabledCheck.prop('checked', s.isEnabled);
-
-    $('#scene-location-display').text(s.scene.location);
-    $('#scene-user-pos-display').text(s.scene.userPosition);
-    $('#scene-char-pos-display').text(s.scene.charPosition);
 
     $('#outfit-outer-display').text(s.outfit.outerWear || '—');
     $('#outfit-top-display').text(s.outfit.top || '—');
@@ -211,7 +146,6 @@ function syncUI() {
     $('#outfit-shoes-display').text(s.outfit.shoes || '—');
     $('#outfit-features-display').text(s.outfit.features || '—');
 }
-
 
 function makeEditable(selector, settingPath) {
     $(document).on('click', selector, function() {
@@ -236,126 +170,95 @@ function makeEditable(selector, settingPath) {
 function setupUI() {
     try {
         const settingsHtml = `
-<div class="scene-outfit-settings">
+<div class="outfit-monitor-settings">
     <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
-            <b>📍 Scene & Outfit Monitor</b>
+            <b>👔 Outfit Monitor</b>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
             <label class="checkbox_label">
-                <input type="checkbox" id="scene-outfit-enabled">
+                <input type="checkbox" id="outfit-enabled">
                 <span>Включить мониторинг</span>
             </label>
             <hr>
 
-            <!-- СЦЕНА -->
-            <div class="scene-glass-panel">
-                <div class="scene-section-title">📍 СЦЕНА</div>
-
-                <div class="scene-info-row">
-                    <span class="scene-label">📌 Локация:</span>
-                    <span class="scene-value editable" id="scene-location-display">—</span>
-                </div>
-
-                <div class="scene-info-row">
-                    <span class="scene-label">🧍 {{user}}:</span>
-                    <span class="scene-value editable" id="scene-user-pos-display">—</span>
-                </div>
-
-                <div class="scene-info-row">
-                    <span class="scene-label">🎭 {{char}}:</span>
-                    <span class="scene-value editable" id="scene-char-pos-display">—</span>
-                </div>
-            </div>
-
-            <!-- АУТФИТ -->
             <div class="outfit-glass-panel">
-                <div class="scene-section-title">👔 АУТФИТ {{user}}</div>
+                <div class="outfit-section-title">👔 АУТФИТ {{user}}</div>
 
-                <div class="scene-info-row">
-                    <span class="scene-label">🧥 Верхняя одежда:</span>
-                    <span class="scene-value editable" id="outfit-outer-display">—</span>
+                <div class="outfit-info-row">
+                    <span class="outfit-label">🧥 Верхняя одежда:</span>
+                    <span class="outfit-value editable" id="outfit-outer-display">—</span>
                 </div>
 
-                <div class="scene-info-row">
-                    <span class="scene-label">👕 Верх:</span>
-                    <span class="scene-value editable" id="outfit-top-display">—</span>
+                <div class="outfit-info-row">
+                    <span class="outfit-label">👕 Верх:</span>
+                    <span class="outfit-value editable" id="outfit-top-display">—</span>
                 </div>
 
-                <div class="scene-info-row">
-                    <span class="scene-label">👖 Низ:</span>
-                    <span class="scene-value editable" id="outfit-bottom-display">—</span>
+                <div class="outfit-info-row">
+                    <span class="outfit-label">👖 Низ:</span>
+                    <span class="outfit-value editable" id="outfit-bottom-display">—</span>
                 </div>
 
-                <div class="scene-info-row">
-                    <span class="scene-label">👗 Платье:</span>
-                    <span class="scene-value editable" id="outfit-dress-display">—</span>
+                <div class="outfit-info-row">
+                    <span class="outfit-label">👗 Платье:</span>
+                    <span class="outfit-value editable" id="outfit-dress-display">—</span>
                 </div>
 
-                <div class="scene-info-row">
-                    <span class="scene-label">🩲 Бельё:</span>
-                    <span class="scene-value editable" id="outfit-underwear-display">—</span>
+                <div class="outfit-info-row">
+                    <span class="outfit-label">🩲 Бельё:</span>
+                    <span class="outfit-value editable" id="outfit-underwear-display">—</span>
                 </div>
 
-                <div class="scene-info-row">
-                    <span class="scene-label">💍 Аксессуары:</span>
-                    <span class="scene-value editable" id="outfit-accessories-display">—</span>
+                <div class="outfit-info-row">
+                    <span class="outfit-label">💍 Аксессуары:</span>
+                    <span class="outfit-value editable" id="outfit-accessories-display">—</span>
                 </div>
 
-                <div class="scene-info-row">
-                    <span class="scene-label">👟 Обувь:</span>
-                    <span class="scene-value editable" id="outfit-shoes-display">—</span>
+                <div class="outfit-info-row">
+                    <span class="outfit-label">👟 Обувь:</span>
+                    <span class="outfit-value editable" id="outfit-shoes-display">—</span>
                 </div>
 
-                <div class="scene-info-row">
-                    <span class="scene-label">✨ Особенности:</span>
-                    <span class="scene-value editable" id="outfit-features-display">—</span>
+                <div class="outfit-info-row">
+                    <span class="outfit-label">✨ Особенности:</span>
+                    <span class="outfit-value editable" id="outfit-features-display">—</span>
                 </div>
             </div>
 
             <small style="opacity: 0.5; margin-top: 10px; display: block;">
-                💡 Кликни на любое поле чтобы изменить вручную
+                💡 Кликни на поле чтобы изменить вручную
             </small>
         </div>
     </div>
 </div>
 
 <style>
-.scene-outfit-settings .inline-drawer-content {
+.outfit-monitor-settings .inline-drawer-content {
     padding: 10px;
 }
 
-.scene-glass-panel, .outfit-glass-panel {
-    margin-top: 15px;
+.outfit-glass-panel {
+    margin-top: 10px;
     padding: 15px;
-    background: rgba(120, 160, 255, 0.08);
+    background: rgba(255, 159, 243, 0.08);
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
-    border: 1px solid rgba(120, 160, 255, 0.2);
+    border: 1px solid rgba(255, 159, 243, 0.2);
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(120, 160, 255, 0.15);
-}
-
-.outfit-glass-panel {
-    background: rgba(255, 159, 243, 0.08);
-    border-color: rgba(255, 159, 243, 0.2);
     box-shadow: 0 8px 32px rgba(255, 159, 243, 0.15);
 }
 
-.scene-section-title {
+.outfit-section-title {
     font-size: 13px;
     font-weight: 600;
-    color: #78a0ff;
+    color: #ff9ff3;
     margin-bottom: 10px;
     letter-spacing: 0.5px;
 }
 
-.outfit-glass-panel .scene-section-title {
-    color: #ff9ff3;
-}
-
-.scene-info-row {
+.outfit-info-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -363,33 +266,29 @@ function setupUI() {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.scene-info-row:last-child {
+.outfit-info-row:last-child {
     border-bottom: none;
 }
 
-.scene-label {
+.outfit-label {
     font-size: 12px;
     opacity: 0.7;
 }
 
-.scene-value {
+.outfit-value {
     font-weight: 500;
-    color: #78a0ff;
+    color: #ff9ff3;
     font-size: 12px;
 }
 
-.outfit-glass-panel .scene-value {
-    color: #ff9ff3;
-}
-
-.scene-value.editable {
+.outfit-value.editable {
     cursor: pointer;
     padding: 4px 8px;
     border-radius: 6px;
     transition: all 0.2s ease;
 }
 
-.scene-value.editable:hover {
+.outfit-value.editable:hover {
     background: rgba(255, 255, 255, 0.1);
     transform: translateY(-1px);
 }
@@ -404,15 +303,12 @@ hr {
 
     $('#extensions_settings2').append(settingsHtml);
 
-    $('#scene-outfit-enabled').on('change', function() {
+    $('#outfit-enabled').on('change', function() {
         getSettings().isEnabled = this.checked;
         saveSettingsDebounced();
         updatePromptInjection();
     });
 
-    makeEditable('#scene-location-display', 'scene.location');
-    makeEditable('#scene-user-pos-display', 'scene.userPosition');
-    makeEditable('#scene-char-pos-display', 'scene.charPosition');
     makeEditable('#outfit-outer-display', 'outfit.outerWear');
     makeEditable('#outfit-top-display', 'outfit.top');
     makeEditable('#outfit-bottom-display', 'outfit.bottom');
@@ -424,7 +320,7 @@ hr {
 
     syncUI();
     } catch (error) {
-        console.error('[SceneOutfit] Ошибка setupUI:', error);
+        console.error('[Outfit] Ошибка setupUI:', error);
     }
 }
 
@@ -439,25 +335,25 @@ function loadSettings() {
                 }
             }
         }
-        console.log('[SceneOutfit] Настройки загружены:', extension_settings[extensionName]);
+        console.log('[Outfit] Настройки загружены');
     } catch (error) {
-        console.error('[SceneOutfit] Ошибка загрузки настроек:', error);
+        console.error('[Outfit] Ошибка загрузки:', error);
         extension_settings[extensionName] = JSON.parse(JSON.stringify(defaultSettings));
     }
 }
 
 jQuery(async () => {
     try {
-        console.log('[SceneOutfit] Инициализация...');
+        console.log('[Outfit] Инициализация...');
 
         loadSettings();
-        console.log('[SceneOutfit] Settings OK');
+        console.log('[Outfit] Settings OK');
         
         setupUI();
-        console.log('[SceneOutfit] UI OK');
+        console.log('[Outfit] UI OK');
         
         updatePromptInjection();
-        console.log('[SceneOutfit] Prompt OK');
+        console.log('[Outfit] Prompt OK');
 
         eventSource.on(event_types.MESSAGE_RECEIVED, () => {
             const chat = window.chat || [];
@@ -466,7 +362,7 @@ jQuery(async () => {
             const lastMessage = chat[chat.length - 1];
             if (!lastMessage || lastMessage.is_user) return;
 
-            console.log('[SceneOutfit] Парсинг сообщения...');
+            console.log('[Outfit] Парсинг...');
             parseAIMessage(lastMessage.mes);
         });
 
@@ -474,8 +370,8 @@ jQuery(async () => {
             updatePromptInjection();
         });
 
-        console.log('[SceneOutfit] ✅ Расширение загружено');
+        console.log('[Outfit] ✅ Загружено');
     } catch (error) {
-        console.error('[SceneOutfit] ❌ FATAL ERROR:', error);
+        console.error('[Outfit] ❌ FATAL:', error);
     }
 });
