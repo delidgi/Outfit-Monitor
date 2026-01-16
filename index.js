@@ -265,7 +265,8 @@ function makeEditable(selector, settingPath) {
 // ============================================
 
 function setupUI() {
-    const settingsHtml = `
+    try {
+        const settingsHtml = `
 <div class="scene-outfit-settings">
     <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
@@ -455,6 +456,9 @@ hr {
     makeEditable('#outfit-features-display', 'outfit.features');
 
     syncUI();
+    } catch (error) {
+        console.error('[SceneOutfit] Ошибка setupUI:', error);
+    }
 }
 
 // ============================================
@@ -462,17 +466,22 @@ hr {
 // ============================================
 
 function loadSettings() {
-    if (!extension_settings[extensionName]) {
-        extension_settings[extensionName] = structuredClone(defaultSettings);
-    } else {
-        // Merge с defaults
-        for (const key in defaultSettings) {
-            if (extension_settings[extensionName][key] === undefined) {
-                extension_settings[extensionName][key] = defaultSettings[key];
+    try {
+        if (!extension_settings[extensionName]) {
+            extension_settings[extensionName] = JSON.parse(JSON.stringify(defaultSettings));
+        } else {
+            // Merge с defaults
+            for (const key in defaultSettings) {
+                if (extension_settings[extensionName][key] === undefined) {
+                    extension_settings[extensionName][key] = defaultSettings[key];
+                }
             }
         }
+        console.log('[SceneOutfit] Настройки загружены:', extension_settings[extensionName]);
+    } catch (error) {
+        console.error('[SceneOutfit] Ошибка загрузки настроек:', error);
+        extension_settings[extensionName] = JSON.parse(JSON.stringify(defaultSettings));
     }
-    console.log('[SceneOutfit] Настройки загружены:', extension_settings[extensionName]);
 }
 
 jQuery(async () => {
@@ -480,8 +489,13 @@ jQuery(async () => {
         console.log('[SceneOutfit] Инициализация...');
 
         loadSettings();
+        console.log('[SceneOutfit] Settings OK');
+        
         setupUI();
+        console.log('[SceneOutfit] UI OK');
+        
         updatePromptInjection();
+        console.log('[SceneOutfit] Prompt OK');
 
         // Слушаем сообщения от AI
         eventSource.on(event_types.MESSAGE_RECEIVED, () => {
@@ -502,6 +516,6 @@ jQuery(async () => {
 
         console.log('[SceneOutfit] ✅ Расширение загружено');
     } catch (error) {
-        console.error('[SceneOutfit] ОШИБКА:', error);
+        console.error('[SceneOutfit] ❌ FATAL ERROR:', error);
     }
 });
